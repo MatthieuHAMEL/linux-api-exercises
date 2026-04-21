@@ -175,7 +175,7 @@ auto main(int argc, char *argv[]) -> int
     if (!StdOut.write_all(buf, rc))
       return diagErr("write stdout failed", EXIT_FAILURE);
     if (outfile.is_open() && !outfile.write_all(buf, rc))
-        return diagErr("write outfile failed", EXIT_FAILURE);
+      return diagErr("write outfile failed", EXIT_FAILURE);
   }
 
   // normal close
