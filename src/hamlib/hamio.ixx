@@ -94,7 +94,7 @@ export namespace Ham
     }
 
     int close() {
-      if (_fd == -1) [[unlikely]] return -1;
+      if (_fd == -1) [[unlikely]] return 0;
       int rc = ::close(_fd);
       _fd = -1;
       return rc;

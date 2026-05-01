@@ -11,9 +11,9 @@ import hamutil;
 
 auto main() -> int
 {
-  auto f = Ham::File("foo.txt", O_WRONLY);
+  auto f = Ham::File("foo.txt", O_WRONLY|O_CREAT);
   if (!f.is_open()) [[unlikely]]
-    return Ham::Diag("Error opening f for writing", EXIT_FAILURE);
+    return Ham::Diag("Error opening file for writing", EXIT_FAILURE);
 
   constexpr std::string_view sv = "Hello I am a text";
   if (!f.write_all(sv.data(), sv.length()))

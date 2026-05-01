@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cerrno>
 
 import hamio;
 import hamutil;
@@ -18,24 +19,20 @@ void usage()
    Equivalent to "cp --sparse=always" */
 auto main(int argc, char *argv[]) -> int
 {
-  if (argc > 3)
+  if (argc != 3)
   {
     usage();
     return EXIT_FAILURE;
   }
 
   // Open file1 and file2
-  auto f1 = Ham::File(argv[1], O_RDONLY);
+  auto f1 = Ham::File(argv[1], O_RDONLY | O_CLOEXEC);
   if (!f1.is_open()) [[unlikely]]
     return Ham::Diag("Error opening file1 for reading", EXIT_FAILURE);
 
   // I don't support the -f mode
   // => I check the file does not exist to avoid accidents
-  auto path_f2 = Ham::Path(argv[2]);
-  if (path_f2.exists(F_OK)) [[unlikely]]
-    return Ham::Diag("file2 already exists", EXIT_FAILURE);
-  
-  auto f2 = path_f2.open(O_CREAT | O_WRONLY);
+  auto f2 = Ham::File(argv[2], O_CREAT | O_WRONLY | O_EXCL | O_CLOEXEC);
   if (!f2.is_open()) [[unlikely]]
     return Ham::Diag("Error opening file2 for writing", EXIT_FAILURE);
 
@@ -48,8 +45,7 @@ auto main(int argc, char *argv[]) -> int
   if (-1 == ::lseek(f1.fd(), 0, SEEK_SET)) [[unlikely]]
     return Ham::Diag("Unexpected lseek(set) error", EXIT_FAILURE);
     
-  // Now I use the linux >= 3.1 API to get data and holes alternatively
-  // until fullsize is reached
+  // Now get data and holes alternatively until fullsize is reached
   off_t total = 0;
   char buf[4096];
   while (true)
@@ -71,15 +67,22 @@ auto main(int argc, char *argv[]) -> int
     if (total == fullsize) // done; else there's a hole
       break;
 
-    // rc - total is the size of the hole
-    off_t rc = ::lseek(f1.fd(), fullsize, SEEK_DATA);
+    off_t rc = ::lseek(f1.fd(), total, SEEK_DATA); // SEEK_DATA: linux 3.1
     if (-1 == rc) [[unlikely]]
-      return Ham::Diag("Unexpected lseek error", EXIT_FAILURE);
-    
-    memset(buf, '\0', rc - total);
-    if (!f2.write_all(buf, rc - total)) [[unlikely]]
-      return Ham::Diag("Unexpected write(hole) error", EXIT_FAILURE);
+    {
+      if (errno == ENXIO) break; // trailing hole!
+      return Ham::Diag("Unexpected lseek (file1) error", EXIT_FAILURE);
+    }
+    total += rc;
+
+    // Create the hole in file2
+    if (-1 == ::lseek(f2.fd(), rc, SEEK_CUR))
+      return Ham::Diag("Unexpected lseek (file2) error", EXIT_FAILURE);
   }
+
+  // Give file2 its final size with respect to file1's trailing hole
+  if (::ftruncate(f2.fd(), fullsize) == -1)
+    return Ham::Diag("ftruncate file2 failed", EXIT_FAILURE);
 
   if (-1 == f1.close()) [[unlikely]]
     return Ham::Diag("close file1 failed", EXIT_FAILURE);
