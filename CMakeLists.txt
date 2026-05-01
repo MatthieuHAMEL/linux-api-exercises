@@ -15,7 +15,7 @@ set(CMAKE_CXX_MODULE_STD 1)
 project(kerrisk LANGUAGES C CXX)
 
 # collect all sources
-file(GLOB_RECURSE MODULE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.ixx")
+file(GLOB_RECURSE MODULE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/hamlib/*.ixx")
 file(GLOB_RECURSE CPP_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 #file(GLOB_RECURSE C_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
 
@@ -25,7 +25,7 @@ add_executable(tee)
 
 target_sources(tee
   PRIVATE "${CMAKE_SOURCE_DIR}/src/tee.cpp"
-  #PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
+  PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
 )
 
 #target_include_directories(tee PRIVATE ${CMAKE_SOURCE_DIR}/include)
