@@ -88,8 +88,9 @@ export namespace Ham
 
     int open(const char* iFilePath, int iFlags) {
       close();
+      // nb: mode (the 3rd arg) is ignored if iFlags doesn't have O_CREAT or O_TMPFILE
       _fd = ::open(iFilePath, iFlags, S_IRUSR | S_IWUSR);
-      return _fd;
+      return _fd; // todo in case of error ensure errno is not lost
     }
 
     int close() {

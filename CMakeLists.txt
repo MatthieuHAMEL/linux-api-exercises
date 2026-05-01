@@ -20,11 +20,23 @@ file(GLOB_RECURSE CPP_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 #file(GLOB_RECURSE C_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
 
 add_executable(tee)
+add_executable(cpholes)
+add_executable(genholes) # for testing
 
 #set_property(TARGET tee PROPERTY C_STANDARD 99)
 
 target_sources(tee
   PRIVATE "${CMAKE_SOURCE_DIR}/src/tee.cpp"
+  PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
+)
+
+target_sources(cpholes
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/cpholes.cpp"
+  PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
+)
+
+target_sources(genholes
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/generate_file_with_holes.cpp"
   PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
 )
 
