@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cerrno>
 
+import std;
 import hamio;
 import hamutil;
 import hampath;
@@ -46,37 +47,46 @@ auto main(int argc, char *argv[]) -> int
     return Ham::Diag("Unexpected lseek(set) error", EXIT_FAILURE);
     
   // Now get data and holes alternatively until fullsize is reached
-  off_t total = 0;
+  off_t cur = 0;
   char buf[4096];
   while (true)
   {
-    // Read as much as possible from file1 and write it to file2
-    while (true)
+    // Get the position of the next hole
+    off_t rc = ::lseek(f1.fd(), cur, SEEK_HOLE);
+    if (-1 == rc) [[unlikely]]
+      return Ham::Diag("Unexpected lseek (hole) error", EXIT_FAILURE);
+
+    // Reposition and read until that next hole
+    if (-1 == ::lseek(f1.fd(), cur, SEEK_SET)) [[unlikely]]
+      return Ham::Diag("Unexpected lseek (repos) error", EXIT_FAILURE);
+    
+    while ((rc - cur) > 0)
     {
-      ssize_t rc = f1.read(buf, sizeof(buf));
-      if (-1 == rc) [[unlikely]]
-        return Ham::Diag("Unexpected read error", EXIT_FAILURE);
-      if (0 == rc)
-        break;
-      total += rc;
-      
-      if (!f2.write_all(buf, rc)) [[unlikely]]
+      // Read (not more than buf size!)
+      ssize_t r = f1.read(buf, std::min(sizeof(buf), static_cast<size_t>(rc - cur)));
+      if (r <= 0) [[unlikely]]
+        return Ham::Diag("Unexpected read error or EOF", EXIT_FAILURE);
+
+      // Write it to file2
+      if (!f2.write_all(buf, r)) [[unlikely]]
         return Ham::Diag("Unexpected write(data) error", EXIT_FAILURE);
+
+      cur += r;
     }
 
-    if (total == fullsize) // done; else there's a hole
+    if (cur == fullsize) // done; else there's a real hole after that
       break;
 
-    off_t rc = ::lseek(f1.fd(), total, SEEK_DATA); // SEEK_DATA: linux 3.1
+    rc = ::lseek(f1.fd(), cur, SEEK_DATA); // SEEK_DATA: linux 3.1
     if (-1 == rc) [[unlikely]]
     {
-      if (errno == ENXIO) break; // trailing hole!
+      if (errno == ENXIO) break; // it's a trailing hole! It has to be set with ftruncate later
       return Ham::Diag("Unexpected lseek (file1) error", EXIT_FAILURE);
     }
-    total += rc;
+    cur += (rc - cur);
 
     // Create the hole in file2
-    if (-1 == ::lseek(f2.fd(), rc, SEEK_CUR))
+    if (-1 == ::lseek(f2.fd(), rc, SEEK_SET)) // SET because rc is absolute
       return Ham::Diag("Unexpected lseek (file2) error", EXIT_FAILURE);
   }
 

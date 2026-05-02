@@ -22,7 +22,7 @@ export namespace Ham
       while (cnt > 0)
       {
         ssize_t rc = ::write(_fd, buf, cnt);
-        if (rc == -1)
+        if (rc == -1) [[unlikely]] // unlikely in blocking io
         {
           if (errno == EINTR) continue;
           return false;
@@ -34,13 +34,31 @@ export namespace Ham
       return true;
     }
 
-    ssize_t read(void* buf, size_t maxcnt) const {
+    ssize_t read(void* buf, size_t maxcnt) const
+    {
       ssize_t rc;
       do
       {
         rc = ::read(_fd, buf, maxcnt);
       } while (rc == -1 && errno == EINTR);
       return rc;
+    }
+
+    bool read_all(void* buf, size_t cnt) const
+    {
+      while (cnt > 0)
+      {
+        ssize_t rc = ::read(_fd, buf, cnt);
+        if (rc == -1) [[unlikely]] // unlikely in blocking io
+        {
+          if (errno == EINTR) continue;
+          return false;
+        }
+        
+        buf += rc;
+        cnt -= static_cast<size_t>(rc);
+      }  
+      return true;
     }
   
     int fd() const { return _fd; }
