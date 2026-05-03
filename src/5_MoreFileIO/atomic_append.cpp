@@ -43,7 +43,7 @@ auto main(int argc, char* argv[]) -> int
     return Diag("num-bytes is 0");
   
   // Open the given file, create it if necessary
-  auto f = File(argv[1], appendMode | O_WRONLY | O_CREAT);
+  auto f = File(argv[1], appendMode | O_WRONLY | O_CREAT | O_TRUNC);
   if (!f.is_open()) [[unlikely]]
     return Diag("Couldn't open the file", EXIT_FAILURE);
 
