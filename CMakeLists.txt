@@ -19,24 +19,33 @@ file(GLOB_RECURSE MODULE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/haml
 file(GLOB_RECURSE CPP_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 #file(GLOB_RECURSE C_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
 
+# Chapter 4
 add_executable(tee)
 add_executable(cpholes)
 add_executable(genholes) # for testing
 
+# Chapter 5
+add_executable(test_append)
+
 #set_property(TARGET tee PROPERTY C_STANDARD 99)
 
 target_sources(tee
-  PRIVATE "${CMAKE_SOURCE_DIR}/src/tee.cpp"
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/4_FileIO/tee.cpp"
   PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
 )
 
 target_sources(cpholes
-  PRIVATE "${CMAKE_SOURCE_DIR}/src/cpholes.cpp"
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/4_FileIO/cpholes.cpp"
   PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
 )
 
 target_sources(genholes
-  PRIVATE "${CMAKE_SOURCE_DIR}/src/generate_file_with_holes.cpp"
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/4_FileIO/generate_file_with_holes.cpp"
+  PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
+)
+
+target_sources(test_append
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/5_MoreFileIO/test_append.cpp"
   PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
 )
 

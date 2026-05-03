@@ -4,10 +4,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <string_view>
 
 import hamio;
 import hamutil;
+import std;
 
 auto main() -> int
 {
@@ -29,5 +29,7 @@ auto main() -> int
   if (!f.write_all(sv.data(), sv.length()))
     return Ham::Diag("Error writing the file", EXIT_FAILURE);
 
+  pwrite(f.fd(), "toto", 4, 0);
+  
   return 0;
 }
