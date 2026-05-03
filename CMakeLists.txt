@@ -26,6 +26,7 @@ add_executable(genholes) # for testing
 
 # Chapter 5
 add_executable(test_append)
+add_executable(atomic_append)
 
 #set_property(TARGET tee PROPERTY C_STANDARD 99)
 
@@ -46,6 +47,11 @@ target_sources(genholes
 
 target_sources(test_append
   PRIVATE "${CMAKE_SOURCE_DIR}/src/5_MoreFileIO/test_append.cpp"
+  PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
+)
+
+target_sources(atomic_append
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/5_MoreFileIO/atomic_append.cpp"
   PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
 )
 
