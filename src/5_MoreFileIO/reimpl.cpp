@@ -61,7 +61,9 @@ namespace Reimpl
       ssize_t rc = ReadOrWrite(fd, iov[i].iov_base, iov[i].iov_len);
       if (rc == -1) [[unlikely]] // propagate
         return -1;
+      
       total += rc;
+      
       if (static_cast<size_t>(rc) != iov[i].iov_len) // not everything has been read/written so no need to write iov[i+1], etc.
         break;
     }
@@ -76,6 +78,29 @@ namespace Reimpl
   {
     return ReadOrWritev<void*, &::read>(fd, iov, iovcnt);
   }
+
+  int setenv(const char *name, const char *value, int overwrite)
+  {
+    if (!name || name[0] == '\0' || !value || strchr(name, '='))
+    {
+      errno = EINVAL;
+      return -1;
+    }
+
+    if (overwrite == 0 && getenv(name))
+      return 0; // nothing to do
+    
+    char* newstr = static_cast<char*>(malloc(strlen(name) + strlen(value) + 2)); // name=value + \0
+    if (!newstr)
+    {
+      errno = ENOMEM;
+      return -1;
+    }
+    sprintf(newstr, "%s=%s", name, value);
+    return ::putenv(newstr); // leaky by design; the real setenv probably tracks the allocated strings somewhere
+    return 0;
+  }
+//  int unsetenv(const char *name);
 }
 
 auto main() -> int
@@ -103,6 +128,15 @@ auto main() -> int
   
   printf("written -> %zu\n", static_cast<size_t>(nwritten));
 
+  /////////// Chapter 6 (processes) ///////////////
+  ///// Read the current environment and print it:
+  Reimpl::setenv("bonjour", "martin", 0);
+  Reimpl::setenv("bonjour", "florence", 0);
+  Reimpl::setenv("bonjour", "pierre", /*overwrite*/1);
   
+  for (char** ppEnvVar = environ; *ppEnvVar != nullptr; ++ppEnvVar)
+  {
+    printf("--) %s\n", *ppEnvVar);
+  }
   return EXIT_SUCCESS;
 }
