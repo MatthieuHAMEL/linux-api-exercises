@@ -41,7 +41,7 @@ namespace Reimpl
   template <typename BufType, ssize_t ReadOrWrite(int fd, BufType buf, size_t cnt)>
   ssize_t ReadOrWritev(int fd, const struct iovec *iov, int iovcnt)
   {
-    if (!iov) [[unlikely]]
+    if (!iov || iovcnt < 0) [[unlikely]]
     {
       errno = EINVAL;
       return -1;
@@ -50,6 +50,14 @@ namespace Reimpl
     ssize_t total = 0;
     for (int i = 0; i < iovcnt; ++i)
     {
+      if (iov[i].iov_len == 0) [[unlikely]]
+        continue;
+
+      if (iov[i].iov_len > static_cast<size_t>(std::numeric_limits<ssize_t>::max() - total)) [[unlikely]]
+      {
+        errno = EINVAL;
+        return -1;
+      }
       ssize_t rc = ReadOrWrite(fd, iov[i].iov_base, iov[i].iov_len);
       if (rc == -1) [[unlikely]] // propagate
         return -1;
