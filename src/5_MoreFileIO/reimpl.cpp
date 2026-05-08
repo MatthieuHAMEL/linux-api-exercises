@@ -100,7 +100,37 @@ namespace Reimpl
     return ::putenv(newstr); // leaky by design; the real setenv probably tracks the allocated strings somewhere
     return 0;
   }
-//  int unsetenv(const char *name);
+
+  /* As said by the assignment, and just like in glibc, unsetenv does not free the removed strings since it cannot
+     know how they were allocated. */
+  int unsetenv(const char *name)
+  {
+    if (!name || *name == '\0' || strchr(name, '=')) [[unlikely]]
+    {
+      errno = EINVAL;
+      return -1;
+    }
+
+    size_t const nameLen = strlen(name);
+    // if !getenv(name) then there is nothing to do
+    // but since I may directly modify environ anyway, it is more efficient to loop manually once
+    for (char** ppEnvVar = environ; *ppEnvVar != nullptr;)
+    {
+      const char* pEnviron = *ppEnvVar;      
+      if (!strncmp(name, pEnviron, nameLen) && pEnviron[nameLen] == '=') [[unlikely]] // found!
+      {
+        // Shift everyone left
+        for (char** ppTmp = ppEnvVar; *ppTmp != nullptr; ++ppTmp)
+          *ppTmp = *(ppTmp + 1); // will include the null slot at the end
+        // the assignment says I should do it until the end if there are multiple identical keys... so no break.
+      }
+      else // Increment only if the rest wasn't shifted!
+      {
+        ++ppEnvVar;
+      }
+    }
+    return 0;
+  }
 }
 
 auto main() -> int
@@ -129,11 +159,15 @@ auto main() -> int
   printf("written -> %zu\n", static_cast<size_t>(nwritten));
 
   /////////// Chapter 6 (processes) ///////////////
-  ///// Read the current environment and print it:
+  // Quick tests for setenv
   Reimpl::setenv("bonjour", "martin", 0);
   Reimpl::setenv("bonjour", "florence", 0);
   Reimpl::setenv("bonjour", "pierre", /*overwrite*/1);
+
+  Reimpl::unsetenv("bonjour");
+  Reimpl::unsetenv("IAmNotAnEnvironmentVariable");
   
+  ///// Read the current environment and print it:
   for (char** ppEnvVar = environ; *ppEnvVar != nullptr; ++ppEnvVar)
   {
     printf("--) %s\n", *ppEnvVar);
