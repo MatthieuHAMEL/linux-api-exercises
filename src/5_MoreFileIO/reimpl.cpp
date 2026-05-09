@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cerrno>
+#include <cassert>
 
 import std;
 import hamio;
@@ -122,6 +123,7 @@ namespace Reimpl
         // Shift everyone left
         for (char** ppTmp = ppEnvVar; *ppTmp != nullptr; ++ppTmp)
           *ppTmp = *(ppTmp + 1); // will include the null slot at the end
+
         // the assignment says I should do it until the end if there are multiple identical keys... so no break.
       }
       else // Increment only if the rest wasn't shifted!
@@ -160,17 +162,20 @@ auto main() -> int
 
   /////////// Chapter 6 (processes) ///////////////
   // Quick tests for setenv
-  Reimpl::setenv("bonjour", "martin", 0);
-  Reimpl::setenv("bonjour", "florence", 0);
-  Reimpl::setenv("bonjour", "pierre", /*overwrite*/1);
+  assert(0 == Reimpl::setenv("bonjour", "martin", 0));
+  assert(0 == Reimpl::setenv("bonjour", "florence", 0));
+  assert(0 == Reimpl::setenv("bonjour", "pierre", /*overwrite*/1));
+  assert(-1 == Reimpl::setenv(nullptr, "toto", 1));
+  assert(-1 == Reimpl::setenv("tata", nullptr, 0));
+  assert(-1 == Reimpl::setenv("", "babar", 0));
 
-  Reimpl::unsetenv("bonjour");
-  Reimpl::unsetenv("IAmNotAnEnvironmentVariable");
+  assert(0 == Reimpl::unsetenv("bonjour"));
+  assert(0 == Reimpl::unsetenv("IAmNotAnEnvironmentVariable"));
+  assert(-1 == Reimpl::unsetenv(nullptr));
   
-  ///// Read the current environment and print it:
+  // Read the current environment and print it:
   for (char** ppEnvVar = environ; *ppEnvVar != nullptr; ++ppEnvVar)
-  {
     printf("--) %s\n", *ppEnvVar);
-  }
+  
   return EXIT_SUCCESS;
 }
