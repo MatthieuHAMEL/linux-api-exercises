@@ -27,7 +27,12 @@ add_executable(genholes) # for testing
 # Chapter 5
 add_executable(test_append)
 add_executable(atomic_append)
+
+# Chapters 5 and 6
 add_executable(reimpl)
+
+# Chapter 7
+add_executable(allocator)
 
 #set_property(TARGET tee PROPERTY C_STANDARD 99)
 
@@ -60,6 +65,12 @@ target_sources(reimpl
   PRIVATE "${CMAKE_SOURCE_DIR}/src/5_MoreFileIO/reimpl.cpp"
   PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
 )
+
+target_sources(allocator
+  PRIVATE "${CMAKE_SOURCE_DIR}/src/7_MemoryAllocation/allocator.cpp"
+  PRIVATE FILE_SET cxx_modules TYPE CXX_MODULES FILES ${MODULE_SOURCES}
+)
+
 
 #target_include_directories(tee PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
