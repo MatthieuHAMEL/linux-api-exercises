@@ -34,7 +34,7 @@ namespace Ham
   
   FreeBlock* FREELIST = nullptr; // Sorted (by construction) single linked list
   const int PAGESIZE = getpagesize();
-  const char* HAMTRACE = std::getenv("HAMTRACE"); // simple stdout tracing
+  const char* HAMTRACE = std::getenv("HAMTRACE"); // simple stdout tracing. Beware: printf is not guaranteed to be malloc-free...
 
   int i = 0;
   void DumpFreeList()
@@ -48,7 +48,7 @@ namespace Ham
       printf("B%d[sz=", j++); // actually dangerous because printf may allocate
       printf("%zu",(*ppFreeBlock)->sz);
       printf("; next=");
-      printf("%p]\n",(*ppFreeBlock)->next); fflush(stdout);
+      printf("%p] (at %p)\n",(*ppFreeBlock)->next, *ppFreeBlock); fflush(stdout);
     }
     
   }
@@ -57,13 +57,8 @@ namespace Ham
   {
     // change the input size to a multiple of 8 bytes so that when it becomes a freeblock there is room for the 'next' pointer
     size_t size = (requested / STBY) * STBY;
-    if (requested != size) [[likely]] size += STBY; // round up!
-    
-    if (HAMTRACE) // temp trace...
-    {
-      DumpFreeList();
-    }
-    
+    if (!size || requested != size) [[likely]] size += STBY; // round up!
+        
     // Try to find a suitable block in the freelist
     FreeBlock** ppFreeBlock = &FREELIST;
     for (; *ppFreeBlock; ppFreeBlock = &(*ppFreeBlock)->next)
@@ -120,32 +115,51 @@ namespace Ham
     newLastFreeBlock->next = nullptr;
 
     // Have the former last free block point on the new last free block
-    *ppFreeBlock = newLastFreeBlock; //[TODO BUG] I think we leak the former last free block here
-    // Should it be instead:
-    // (*ppFreeBlock)->next = newLastFreeBlock;   // simply?
+    *ppFreeBlock = newLastFreeBlock;
     
     return reinterpret_cast<void*>(reinterpret_cast<size_t>(formerPBRK) + STBY);
   }
 
   void free(void* ptr)
   {
-    // TODO
-    ++i;
-
     if (!ptr) [[unlikely]]
       return;
     
     // If a freeblock is pointing on the newly released zone, it could be merged with the current one
     FreeBlock* pNewFreeBlock = reinterpret_cast<FreeBlock*>(reinterpret_cast<size_t>(ptr) - STBY);
 
-    // Loop on existing freeblocks; the freelist is sorted. No need to go past pNewfreeBlock
-    FreeBlock** ppFreeBlock = &FREELIST;
-    for (; *ppFreeBlock; ppFreeBlock = &(*ppFreeBlock)->next)
+    // Loop on existing freeblocks; find the block that will be before the new block
+    FreeBlock* pFreeBlockPrev = nullptr;
+    if (FREELIST && FREELIST < pNewFreeBlock)
     {
-      
+      for (pFreeBlockPrev = FREELIST; pFreeBlockPrev && pFreeBlockPrev->next < pNewFreeBlock; pFreeBlockPrev = pFreeBlockPrev->next)
+        ;
     }
 
-    
+    // Find the free block that will follow pNewFreeBlock
+    FreeBlock** ppFreeBlockNext = pFreeBlockPrev ? &(pFreeBlockPrev->next) : &FREELIST;
+
+    // Insert the block
+    pNewFreeBlock->next = *ppFreeBlockNext;
+    *ppFreeBlockNext = pNewFreeBlock;
+
+    // Right collapse ?
+    if (reinterpret_cast<size_t>(pNewFreeBlock) + STBY + pNewFreeBlock->sz == reinterpret_cast<size_t>(pNewFreeBlock->next))
+    {
+      // The "next" block is integrated to the newly added block.
+      pNewFreeBlock->sz += pNewFreeBlock->next->sz + STBY;
+      pNewFreeBlock->next = pNewFreeBlock->next->next;
+    }
+
+    // Left collapse ?
+    if (pFreeBlockPrev && reinterpret_cast<size_t>(pFreeBlockPrev) + STBY + pFreeBlockPrev->sz == reinterpret_cast<size_t>(pNewFreeBlock))
+    {
+      // The newly added block is integrated to the "prev" block.
+      pFreeBlockPrev->sz += pNewFreeBlock->sz + STBY;
+      pFreeBlockPrev->next = pNewFreeBlock->next;
+    }
+
+    // By construction there cannot be "recursive collapse" i.e. two just-collapsed blocks that would collapse with the next one.
   }
 }
 
@@ -163,9 +177,13 @@ struct Chunk // "metainformation"
   size_t sz = 0;
 };
 
+
+constexpr size_t NB_CHUNKS = 500;
+constexpr size_t NB_ITER = 10000;
+
 auto main() -> int
 {
-  std::array<Chunk, 500> CHUNKS;
+  std::array<Chunk, NB_CHUNKS> CHUNKS;
 
   auto randomNumber = [](size_t n) // allocation free rng (thx chatgpt !)
   {
@@ -178,14 +196,20 @@ auto main() -> int
   };
 
   // Random sequence of malloc or free of random sizes, on random chunks
-  for (int i = 0; i < 10000; ++i)
+  for (size_t i = 0; i < NB_ITER; ++i)
   {
+    if (Ham::HAMTRACE) // temp trace...
+    {
+      Ham::DumpFreeList();
+    }
+    
     // Pick a random chunk among the 500 available chunks
     auto& chunk = CHUNKS[randomNumber(CHUNKS.size())];
 
     // If it is allocated, free it
     if (chunk.ptr)
     {
+      printf("step %zu frees addr %p\n", i, chunk.ptr);
       Ham::free(chunk.ptr);
       chunk.ptr = nullptr;
     }
@@ -194,26 +218,32 @@ auto main() -> int
       chunk.sz = randomNumber(10000);
       if (Ham::HAMTRACE)
       {
-        printf("step %d needs %zu\n", i, chunk.sz);
+        printf("step %zu mallocs %zu\n", i, chunk.sz);
       }
 
       chunk.ptr = Ham::malloc(chunk.sz);
       assert(chunk.ptr);
     }
+
+    printf("-----------end step\n\n\n");
   }
 
   // Play with small-sized mallocs
   for (size_t i = 0; i <= 64; ++i)
   {
+    Ham::DumpFreeList();
     auto& someChunk = CHUNKS[12 + i];
     if (someChunk.ptr)
     {
+      printf("small free of %p\n", someChunk.ptr); fflush(stdout);
       Ham::free(someChunk.ptr);
       someChunk.ptr = nullptr;
     }
     // 0 bytes to 64 bytes allocation
     someChunk.sz = i;
     someChunk.ptr = Ham::malloc(i);
+    printf("small malloc of %zu at %p\n", i, someChunk.ptr);
+    printf("-----------end step\n\n\n"); fflush(stdout);
   }
   
   // Free everything
@@ -221,9 +251,18 @@ auto main() -> int
   {
     if (chunk.ptr)
     {
+      Ham::DumpFreeList();
+      printf("final free of %p\n", chunk.ptr);
       Ham::free(chunk.ptr);
       chunk.ptr = nullptr;
+      printf("-----------end step\n\n\n"); fflush(stdout);
     }
   }
+
+  printf("Final free list :\n");
+  Ham::DumpFreeList();
+
+  // There should be one big block in the final freelist.
+  assert(Ham::FREELIST && !(Ham::FREELIST->next));
   return 0;
 }
